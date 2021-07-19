@@ -1,6 +1,3 @@
-# This workflow will upload a Python Package using Twine when a release is created
-# For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
-
 name: Python Package Template
 
 # Controls when the action will run. 
@@ -16,13 +13,13 @@ jobs:
   version:
     # The type of runner that the job will run on
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-ci:master-AMD64
+    container: jfrog.local:8081/reg/base/base-ci:master
 
     steps:
 
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0                # fetch the whole repo history
           persist-credentials: false
@@ -59,11 +56,13 @@ jobs:
     needs: version
     # The type of runner that the job will run on
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-full:master-AMD64
+    container: jfrog.local:8081/reg/base/base-full:master
 
     steps:
-      - uses: actions/checkout@v2.3.4
-          
+
+      - name: Checkout
+        uses: actions/checkout@v2
+      
       - name: Override version in setup.py
         uses: teveltech/version-action@master
         with:
@@ -87,15 +86,16 @@ jobs:
           python2 setup.py bdist_wheel upload -r local
           python3 setup.py bdist_wheel upload -r local
 
-  Github_Tag_and_Release:
+  release:
+    name: Git tag and GitHub release
     needs: [version, Build]
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-ci:master-AMD64
-    
+    container: jfrog.local:8081/reg/base/base-ci:master
+
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2
 
       - name: git config
         run: |
@@ -108,15 +108,15 @@ jobs:
         run: |
           git tag ${{ needs.version.outputs.new_tag }}
           git push --force origin ${{ needs.version.outputs.new_tag }}
-          echo "New lightweight tag: https://github.com/teveltech/${{ github.event.repository.name }}/releases/tag/${{ needs.version.outputs.new_tag }}"
+          echo "New lightweight tag: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/${{ needs.version.outputs.new_tag }}"
           
       - name: Create Annotated Tag
         if: ${{ needs.version.outputs.new_tag && needs.version.outputs.prerelease == 'false' }}
         run: |
           git tag -a ${{ needs.version.outputs.new_tag }} -m "${{ github.event.head_commit.message }}" 
-          git push --force origin ${{needs.version.outputs.new_tag }}
-          echo "New annotated tag: https://github.com/teveltech/${{ github.event.repository.name }}/releases/tag/${{ needs.version.outputs.new_tag }}"
-          
+          git push --force origin ${{ needs.version.outputs.new_tag }}
+          echo "New annotated tag: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/${{ needs.version.outputs.new_tag }}"
+
       - name: Create a GitHub release
         id: release
         if: ${{ needs.version.outputs.new_tag }}
