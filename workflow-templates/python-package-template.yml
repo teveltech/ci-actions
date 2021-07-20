@@ -90,10 +90,9 @@ jobs:
     name: Git tag and GitHub release
     needs: [version, Build]
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-ci:master
+    container: jfrog.local:8081/reg/base/base-core:master
 
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout
         uses: actions/checkout@v2
 
