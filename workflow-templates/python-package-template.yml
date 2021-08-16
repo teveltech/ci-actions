@@ -40,6 +40,7 @@ jobs:
           else
             echo "New tag: ${{ steps.semantic.outputs.new_tag }}"
           fi
+          
     outputs:
       new_tag: ${{ steps.semantic.outputs.new_tag }}
       new_version: ${{ steps.semantic.outputs.new_version }}
@@ -69,17 +70,27 @@ jobs:
         run: |
           pip2 install setuptools wheel twine
           pip3 install setuptools wheel twine
-
       - name: Install dependencies needed to build
         run: |
           if [ -f requirements.txt ]; then pip2 install -r requirements.txt; fi
           if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
-
       - name: Build and publish
         run: |
           python2 setup.py bdist_wheel upload -r local
           python3 setup.py bdist_wheel upload -r local
-
+          
+      - name: get python tag
+        id: pytag
+        run: |
+          cat ./*.egg-info/PKG-INFO | \
+          awk '/^Name:/ {printf $2"=="} /^Version:/ {print $2}'
+          echo "::set-output name=python_tag:: \
+          $(cat ./*.egg-info/PKG-INFO | \
+          awk '/^Name:/ {printf $2"=="} /^Version:/ {print $2}')"
+          
+    outputs:
+      python_tag: ${{ steps.pytag.outputs.python_tag }}
+      
   release:
     name: Git tag and GitHub release
     needs: [version, Build]
@@ -120,6 +131,7 @@ jobs:
           tag_name: ${{ needs.version.outputs.new_tag }}
           name: Release ${{ needs.version.outputs.new_tag }}
           body: |
+            new python package: ${{ needs.Build.outputs.python_tag }}
             ${{ needs.version.outputs.changelog }}
             
       - name: set warning
