@@ -1,6 +1,5 @@
 name: Conan Package Template
 
-# Controls when the action will run. 
 on:
   push:
     branches: [ '*' ]
@@ -8,18 +7,16 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   version:
-    # The type of runner that the job will run on
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-ci:master-AMD64
+    container: jfrog.local:8081/reg/base/base-ci:master
 
     steps:
 
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0                # fetch the whole repo history
           persist-credentials: false
@@ -54,15 +51,13 @@ jobs:
 
   Build:
     needs: version
-    # The type of runner that the job will run on
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-full:master-AMD64
+    container: jfrog.local:8081/reg/base/base-core:master
     
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2
         
       - name: Override version in conanpackage.py
         uses: teveltech/version-action@master
@@ -82,19 +77,18 @@ jobs:
   Github_Tag_and_Release:
     needs: [version, Build]
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-ci:master-AMD64
+    container: jfrog.local:8081/reg/base/base-ci:master
     
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2
 
       - name: git config
         run: |
           git config user.email "Tevel GitHub Runner"
           git config user.name "Tevel GitHub Runner"
           
-      # note: adding a message would create an annotated tag
       - name: Create Lightweight Tag
         if: ${{ needs.version.outputs.new_tag && needs.version.outputs.prerelease == 'true' }}
         run: |
@@ -112,7 +106,7 @@ jobs:
       - name: Create a GitHub release
         id: release
         if: ${{ needs.version.outputs.new_tag }}
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
