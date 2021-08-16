@@ -1,6 +1,5 @@
 name: Python Package Template
 
-# Controls when the action will run. 
 on:
   push:
     branches: [ '*' ]
@@ -8,10 +7,8 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   version:
-    # The type of runner that the job will run on
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-ci:master
 
@@ -43,7 +40,6 @@ jobs:
           else
             echo "New tag: ${{ steps.semantic.outputs.new_tag }}"
           fi
-
     outputs:
       new_tag: ${{ steps.semantic.outputs.new_tag }}
       new_version: ${{ steps.semantic.outputs.new_version }}
@@ -54,33 +50,31 @@ jobs:
 
   Build:
     needs: version
-    # The type of runner that the job will run on
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-full:master
+    container: jfrog.local:8081/reg/base/base-core:master
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v2
-      
+          
       - name: Override version in setup.py
         uses: teveltech/version-action@master
         with:
           new_version: ${{ needs.version.outputs.new_tag }}
-      
+
       - name: Link pypi config directory and .pypirc to github home /github/home
         run: ln -s /root/.pypirc $HOME/.pypirc && ln -s /root/.pip $HOME/.pip
-      
+
       - name: Install dependencies needed to upload
         run: |
           pip2 install setuptools wheel twine
           pip3 install setuptools wheel twine
-        
+
       - name: Install dependencies needed to build
         run: |
           if [ -f requirements.txt ]; then pip2 install -r requirements.txt; fi
           if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
-          
+
       - name: Build and publish
         run: |
           python2 setup.py bdist_wheel upload -r local
@@ -101,7 +95,6 @@ jobs:
           git config user.email "Tevel GitHub Runner"
           git config user.name "Tevel GitHub Runner"
           
-      # note: adding a message would create an annotated tag
       - name: Create Lightweight Tag
         if: ${{ needs.version.outputs.new_tag && needs.version.outputs.prerelease == 'true' }}
         run: |
@@ -115,7 +108,7 @@ jobs:
           git tag -a ${{ needs.version.outputs.new_tag }} -m "${{ github.event.head_commit.message }}" 
           git push --force origin ${{ needs.version.outputs.new_tag }}
           echo "New annotated tag: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/${{ needs.version.outputs.new_tag }}"
-
+          
       - name: Create a GitHub release
         id: release
         if: ${{ needs.version.outputs.new_tag }}
@@ -128,7 +121,7 @@ jobs:
           name: Release ${{ needs.version.outputs.new_tag }}
           body: |
             ${{ needs.version.outputs.changelog }}
-
+            
       - name: set warning
         shell: bash
         run: |
