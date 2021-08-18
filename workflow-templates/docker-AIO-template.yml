@@ -104,7 +104,7 @@ jobs:
           platforms: ${{ env.arch }}
           pull: true
           push: true
-          tags: ${{ secrets.JFROG_URL }}/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }}
+          tags: ${{ secrets.JFROG_URL }}/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }},${{ secrets.JFROG_URL }}/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.branch }}
           cache-from: type=registry,ref=${{ secrets.JFROG_URL }}/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.previous_light_tag }}
           cache-to: type=inline
 
