@@ -13,24 +13,28 @@ jobs:
     container: jfrog.local:8081/reg/base/base-ci:master
 
     steps:
-
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0                # fetch the whole repo history
           persist-credentials: false
-
+          
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+        
       - name: Handle version update
         uses: teveltech/github-tag-action@annotated-tag
         id: semantic
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           dry_run: true
-
+          
       - name: Check new version
         run: |
-          echo "Branch name: ${GITHUB_REF#refs/heads/}"
+          echo "Branch name: ${{ steps.extract_branch.outputs.branch }}"
           echo "Pre-release: ${{ steps.semantic.outputs.prerelease }}"
           echo "Workflow was triggered from ${{ github.event_name }}"
           echo "Previous annotated tag: ${{ steps.semantic.outputs.previous_tag }}"
@@ -48,7 +52,8 @@ jobs:
       previous_tag: ${{ steps.semantic.outputs.previous_tag }}
       prerelease: ${{ steps.semantic.outputs.prerelease }}
       previous_light_tag: ${{ steps.semantic.outputs.previous_light_tag }}
-
+      branch: ${{ steps.extract_branch.outputs.branch }}
+      
   Build:
     needs: version
     runs-on: self-hosted
