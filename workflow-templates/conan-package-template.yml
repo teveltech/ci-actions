@@ -55,10 +55,14 @@ jobs:
           persist-credentials: false
 
       - name: Build and push Conan package
+        id: conan
         uses: teveltech/composite-conan@master
         with:
           new_tag: ${{ needs.version.outputs.new_tag }}
-
+          
+    outputs:
+      package: ${{ steps.conan.outputs.package }}
+      
   release:
     name: Git tag and GitHub release
     needs: [version, build]
@@ -78,4 +82,10 @@ jobs:
           new_tag: ${{ needs.version.outputs.new_tag }}
           prerelease: ${{ needs.version.outputs.prerelease }}
           changelog: ${{ needs.version.outputs.changelog }}
+          body: |
+            New Conan package:
+            <pre><code> ${{ needs.build.outputs.package }} </code></pre>
+          warning: |
+            New Conan package:
+            ${{ needs.build.outputs.package }}
             

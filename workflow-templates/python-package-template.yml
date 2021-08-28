@@ -55,13 +55,13 @@ jobs:
           persist-credentials: false
 
       - name: Build and push python package
-        id: pytag
+        id: python
         uses: teveltech/composite-python@master
         with:
           new_tag: ${{ needs.version.outputs.new_tag }}
           
     outputs:
-      python_tag: ${{ steps.pytag.outputs.tag }}
+      package: ${{ steps.python.outputs.package }}
       
   release:
     name: Git tag and GitHub release
@@ -83,7 +83,9 @@ jobs:
           prerelease: ${{ needs.version.outputs.prerelease }}
           changelog: ${{ needs.version.outputs.changelog }}
           body: |
-            new python package: ${{ needs.build.outputs.python_tag }}
+            New python package:
+            <pre><code> ${{ needs.build.outputs.package }} </code></pre>
           warning: |
-            new python package: ${{ needs.build.outputs.python_tag }}
+            New python package:
+            ${{ needs.build.outputs.package }}
             
