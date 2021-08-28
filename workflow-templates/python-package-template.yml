@@ -84,4 +84,6 @@ jobs:
           changelog: ${{ needs.version.outputs.changelog }}
           body: |
             new python package: ${{ needs.build.outputs.python_tag }}
+          warning: |
+            new python package: ${{ needs.build.outputs.python_tag }}
             
