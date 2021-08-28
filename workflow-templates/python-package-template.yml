@@ -9,32 +9,20 @@ on:
 
 jobs:
   version:
+    name: Handle version update
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-ci:master
-
-    steps:
     
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0                # fetch the whole repo history
-          persist-credentials: false
-          
-      - name: Extract branch name
-        shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
-        id: extract_branch
-        
-      - name: Handle version update
-        uses: teveltech/github-tag-action@annotated-tag
+    steps:
+      - uses: teveltech/composite-version@master
         id: semantic
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          dry_run: true
+          token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Check new version
+        shell: bash
         run: |
-          echo "Branch name: ${{ steps.extract_branch.outputs.branch }}"
+          echo "Branch name: ${{ steps.semantic.outputs.branch }}"
           echo "Pre-release: ${{ steps.semantic.outputs.prerelease }}"
           echo "Workflow was triggered from ${{ github.event_name }}"
           echo "Previous annotated tag: ${{ steps.semantic.outputs.previous_tag }}"
@@ -52,100 +40,48 @@ jobs:
       previous_tag: ${{ steps.semantic.outputs.previous_tag }}
       prerelease: ${{ steps.semantic.outputs.prerelease }}
       previous_light_tag: ${{ steps.semantic.outputs.previous_light_tag }}
-      branch: ${{ steps.extract_branch.outputs.branch }}
+      branch: ${{ steps.semantic.outputs.branch }}
       
-  Build:
+  build:
     needs: version
+    name: Build & Push
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-core:master
 
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-          
-      - name: Override version in setup.py
-        uses: teveltech/version-action@master
         with:
-          new_version: ${{ needs.version.outputs.new_tag }}
+          persist-credentials: false
 
-      - name: Link pypi config directory and .pypirc to github home /github/home
-        run: ln -s /root/.pypirc $HOME/.pypirc && ln -s /root/.pip $HOME/.pip
-
-      - name: Install dependencies needed to upload
-        run: |
-          pip2 install setuptools wheel twine
-          pip3 install setuptools wheel twine
-          
-      - name: Install dependencies needed to build
-        run: |
-          if [ -f requirements.txt ]; then pip2 install -r requirements.txt; fi
-          if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
-          
-      - name: Build and publish
-        run: |
-          python2 setup.py bdist_wheel upload -r local
-          python3 setup.py bdist_wheel upload -r local
-          
-      - name: get python tag
+      - name: Build and push python package
         id: pytag
-        run: |
-          cat ./*.egg-info/PKG-INFO | \
-          awk '/^Name:/ {printf $2"=="} /^Version:/ {print $2}'
-          echo "::set-output name=python_tag:: \
-          $(cat ./*.egg-info/PKG-INFO | \
-          awk '/^Name:/ {printf $2"=="} /^Version:/ {print $2}')"
+        uses: teveltech/composite-python@master
+        with:
+          new_tag: ${{ needs.version.outputs.new_tag }}
           
     outputs:
-      python_tag: ${{ steps.pytag.outputs.python_tag }}
+      python_tag: ${{ steps.pytag.outputs.tag }}
       
   release:
     name: Git tag and GitHub release
-    needs: [version, Build]
+    needs: [version, build]
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-ci:master
-
-    steps:
+    
+    steps:     
       - name: Checkout
         uses: actions/checkout@v2
-
-      - name: git config
-        run: |
-          git config user.email "Tevel GitHub Runner"
-          git config user.name "Tevel GitHub Runner"
-          
-      - name: Create Lightweight Tag
-        if: ${{ needs.version.outputs.new_tag && needs.version.outputs.prerelease == 'true' }}
-        run: |
-          git tag ${{ needs.version.outputs.new_tag }}
-          git push --force origin ${{ needs.version.outputs.new_tag }}
-          echo "New lightweight tag: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/${{ needs.version.outputs.new_tag }}"
-          
-      - name: Create Annotated Tag
-        if: ${{ needs.version.outputs.new_tag && needs.version.outputs.prerelease == 'false' }}
-        run: |
-          git tag -a ${{ needs.version.outputs.new_tag }} -m "${{ github.event.head_commit.message }}" 
-          git push --force origin ${{ needs.version.outputs.new_tag }}
-          echo "New annotated tag: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/${{ needs.version.outputs.new_tag }}"
-          
-      - name: Create a GitHub release
-        id: release
-        if: ${{ needs.version.outputs.new_tag }}
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          persist-credentials: true
+          
+      - name: Handle git tag and github release
+        uses: teveltech/composite-release@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          new_tag: ${{ needs.version.outputs.new_tag }}
           prerelease: ${{ needs.version.outputs.prerelease }}
-          tag_name: ${{ needs.version.outputs.new_tag }}
-          name: Release ${{ needs.version.outputs.new_tag }}
+          changelog: ${{ needs.version.outputs.changelog }}
           body: |
-            new python package: ${{ needs.Build.outputs.python_tag }}
-            ${{ needs.version.outputs.changelog }}
+            new python package: ${{ needs.build.outputs.python_tag }}
             
-      - name: set warning
-        shell: bash
-        run: |
-          STRING="New release: ${{ steps.release.outputs.url }}"
-          STRING="${STRING//'%'/'%25'}"
-          STRING="${STRING//$'\n'/'%0A'}"
-          STRING="${STRING//$'\r'/'%0D'}"
-          echo "::warning::$STRING"
