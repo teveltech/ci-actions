@@ -69,7 +69,6 @@ jobs:
           new_tag: ${{ needs.version.outputs.new_tag }}
           branch: ${{ needs.version.outputs.branch }}
           previous_light_tag: ${{ needs.version.outputs.previous_light_tag }}
-          qemu_image: ${{ secrets.JFROG_URL }}/reg/base/tonistiigi/binfmt:latest
       
   release:
     name: Git tag and GitHub release
