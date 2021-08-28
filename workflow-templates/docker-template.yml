@@ -1,0 +1,96 @@
+name: Docker Image Template
+
+env:
+  namespace:  PLACEHOLDER               # TODO: REPLACE WITH: drone | bin | gcs ...
+  arch:       linux/amd64,linux/arm64   # TODO: replace with correct arch
+  
+on:
+  push:
+    branches: [ '*' ]
+    
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  
+jobs:
+  version:
+    name: Handle version update
+    runs-on: self-hosted
+    container: jfrog.local:8081/reg/base/base-ci:master
+    
+    steps:
+      - uses: teveltech/composite-version@master
+        id: semantic
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Check new version
+        shell: bash
+        run: |
+          echo "Branch name: ${{ steps.semantic.outputs.branch }}"
+          echo "Pre-release: ${{ steps.semantic.outputs.prerelease }}"
+          echo "Workflow was triggered from ${{ github.event_name }}"
+          echo "Previous annotated tag: ${{ steps.semantic.outputs.previous_tag }}"
+          echo "Previous lightweight tag: ${{ steps.semantic.outputs.previous_light_tag }}"
+          if [ -z "${{ steps.semantic.outputs.new_tag }}" ]; then
+            echo "::error::No version bump - no new tag or release will be created. Usually means the workflow was triggered manually or a new branch was created without any changes."
+          else
+            echo "New tag: ${{ steps.semantic.outputs.new_tag }}"
+          fi
+          
+    outputs:
+      new_tag: ${{ steps.semantic.outputs.new_tag }}
+      new_version: ${{ steps.semantic.outputs.new_version }}
+      changelog: ${{ steps.semantic.outputs.changelog }}
+      previous_tag: ${{ steps.semantic.outputs.previous_tag }}
+      prerelease: ${{ steps.semantic.outputs.prerelease }}
+      previous_light_tag: ${{ steps.semantic.outputs.previous_light_tag }}
+      branch: ${{ steps.semantic.outputs.branch }}
+      
+  build:
+    needs: version
+    name: Build & Push
+    runs-on: self-hosted
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+          
+      - name: Build & Push Docker Image
+        id: build
+        uses: teveltech/composite-build-docker@master
+        with:
+          namespace: ${{ env.namespace }}
+          arch: ${{ env.arch }}
+          registry: ${{ secrets.JFROG_URL }}
+          username: ${{ secrets.DOCKER_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+          new_tag: ${{ needs.version.outputs.new_tag }}
+          branch: ${{ needs.version.outputs.branch }}
+          previous_light_tag: ${{ needs.version.outputs.previous_light_tag }}
+          qemu_image: ${{ secrets.JFROG_URL }}/reg/base/tonistiigi/binfmt:latest
+      
+  release:
+    name: Git tag and GitHub release
+    needs: [version, build]
+    runs-on: self-hosted
+    container: jfrog.local:8081/reg/base/base-ci:master
+    
+    steps:     
+    - name: Checkout
+      uses: actions/checkout@v2
+    
+    - name: Handle git tag and github release
+      uses: teveltech/composite-release@master
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        new_tag: ${{ needs.version.outputs.new_tag }}
+        prerelease: ${{ needs.version.outputs.prerelease }}
+        changelog: ${{ needs.version.outputs.changelog }}
+        body: |
+          Docker pull command:
+          <pre><code> docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }} </code></pre>
+        warning: |
+          Docker pull command:
+          docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }}
