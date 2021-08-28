@@ -79,7 +79,9 @@ jobs:
     steps:     
     - name: Checkout
       uses: actions/checkout@v2
-    
+      with:
+        persist-credentials: true
+        
     - name: Handle git tag and github release
       uses: teveltech/composite-release@master
       with:
