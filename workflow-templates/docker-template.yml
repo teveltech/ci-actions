@@ -59,7 +59,7 @@ jobs:
           
       - name: Build & Push Docker Image
         id: build
-        uses: teveltech/composite-build-docker@master
+        uses: teveltech/composite-docker@master
         with:
           namespace: ${{ env.namespace }}
           arch: ${{ env.arch }}
@@ -95,3 +95,4 @@ jobs:
         warning: |
           Docker pull command:
           docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }}
+          
