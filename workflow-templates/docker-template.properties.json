@@ -1,5 +1,5 @@
 {
-    "name": "Docker Image AIO",
+    "name": "Docker Image",
     "description": "Tevel BaseImage workflow template.",
     "categories": [
         "docker",

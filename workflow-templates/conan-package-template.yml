@@ -9,28 +9,20 @@ on:
 
 jobs:
   version:
+    name: Handle version update
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-ci:master
-
+    
     steps:
-
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0                # fetch the whole repo history
-          persist-credentials: false
-
-      - name: Handle version update
-        uses: teveltech/github-tag-action@annotated-tag
+      - uses: teveltech/composite-version@master
         id: semantic
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          dry_run: true
-
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
       - name: Check new version
+        shell: bash
         run: |
-          echo "Branch name: ${GITHUB_REF#refs/heads/}"
+          echo "Branch name: ${{ steps.semantic.outputs.branch }}"
           echo "Pre-release: ${{ steps.semantic.outputs.prerelease }}"
           echo "Workflow was triggered from ${{ github.event_name }}"
           echo "Previous annotated tag: ${{ steps.semantic.outputs.previous_tag }}"
@@ -40,7 +32,7 @@ jobs:
           else
             echo "New tag: ${{ steps.semantic.outputs.new_tag }}"
           fi
-
+          
     outputs:
       new_tag: ${{ steps.semantic.outputs.new_tag }}
       new_version: ${{ steps.semantic.outputs.new_version }}
@@ -48,78 +40,52 @@ jobs:
       previous_tag: ${{ steps.semantic.outputs.previous_tag }}
       prerelease: ${{ steps.semantic.outputs.prerelease }}
       previous_light_tag: ${{ steps.semantic.outputs.previous_light_tag }}
-
-  Build:
+      branch: ${{ steps.semantic.outputs.branch }}
+      
+  build:
     needs: version
+    name: Build & Push
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-core:master
-    
+
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout
         uses: actions/checkout@v2
-        
-      - name: Override version in conanpackage.py
-        uses: teveltech/version-action@master
         with:
-          new_version: ${{ needs.version.outputs.new_tag }}
+          persist-credentials: false
 
-      - name: Link conan config directory to github home /github/home
-        run: rm -rf $HOME/.conan && ln -s /root/.conan $HOME
+      - name: Build and push Conan package
+        id: conan
+        uses: teveltech/composite-conan@master
+        with:
+          new_tag: ${{ needs.version.outputs.new_tag }}
+          
+    outputs:
+      package: ${{ steps.conan.outputs.package }}
       
-      - name: Create conan package
-        shell: bash
-        run: source /opt/ros/melodic/setup.bash && conan create . _/_ -s arch=x86_64 -s arch_build=x86_64 --build missing -r tevel-conan
-        
-      - name: Upload conan packages
-        run: conan upload "*" -c -r tevel-conan --all
-
-  Github_Tag_and_Release:
-    needs: [version, Build]
+  release:
+    name: Git tag and GitHub release
+    needs: [version, build]
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-ci:master
     
-    steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    steps:     
       - name: Checkout
         uses: actions/checkout@v2
-
-      - name: git config
-        run: |
-          git config user.email "Tevel GitHub Runner"
-          git config user.name "Tevel GitHub Runner"
-          
-      - name: Create Lightweight Tag
-        if: ${{ needs.version.outputs.new_tag && needs.version.outputs.prerelease == 'true' }}
-        run: |
-          git tag ${{ needs.version.outputs.new_tag }}
-          git push --force origin ${{ needs.version.outputs.new_tag }}
-          echo "New lightweight tag: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/${{ needs.version.outputs.new_tag }}"
-          
-      - name: Create Annotated Tag
-        if: ${{ needs.version.outputs.new_tag && needs.version.outputs.prerelease == 'false' }}
-        run: |
-          git tag -a ${{ needs.version.outputs.new_tag }} -m "${{ github.event.head_commit.message }}" 
-          git push --force origin ${{ needs.version.outputs.new_tag }}
-          echo "New annotated tag: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/${{ needs.version.outputs.new_tag }}"
-          
-      - name: Create a GitHub release
-        id: release
-        if: ${{ needs.version.outputs.new_tag }}
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          persist-credentials: true
+          
+      - name: Handle git tag and github release
+        uses: teveltech/composite-release@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          new_tag: ${{ needs.version.outputs.new_tag }}
           prerelease: ${{ needs.version.outputs.prerelease }}
-          tag_name: ${{ needs.version.outputs.new_tag }}
-          name: Release ${{ needs.version.outputs.new_tag }}
-          body: ${{ needs.version.outputs.changelog }}
-
-      - name: set warning
-        shell: bash
-        run: |
-          STRING="New release: ${{ steps.release.outputs.url }}"
-          STRING="${STRING//'%'/'%25'}"
-          STRING="${STRING//$'\n'/'%0A'}"
-          STRING="${STRING//$'\r'/'%0D'}"
-          echo "::warning::$STRING"
+          changelog: ${{ needs.version.outputs.changelog }}
+          body: |
+            New Conan package:
+            <pre><code> ${{ needs.build.outputs.package }} </code></pre>
+          warning: |
+            New Conan package:
+            ${{ needs.build.outputs.package }}
+            

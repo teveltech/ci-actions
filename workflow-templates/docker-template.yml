@@ -1,12 +1,16 @@
-name: Python Package Template
+name: Docker Image Template
 
+env:
+  namespace:  PLACEHOLDER               # TODO: REPLACE WITH: drone | bin | gcs ...
+  arch:       linux/amd64,linux/arm64   # TODO: replace with correct arch
+  
 on:
   push:
     branches: [ '*' ]
-
+    
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-
+  
 jobs:
   version:
     name: Handle version update
@@ -46,22 +50,25 @@ jobs:
     needs: version
     name: Build & Push
     runs-on: self-hosted
-    container: jfrog.local:8081/reg/base/base-core:master
-
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v2
         with:
           persist-credentials: false
-
-      - name: Build and push python package
-        id: python
-        uses: teveltech/composite-python@master
-        with:
-          new_tag: ${{ needs.version.outputs.new_tag }}
           
-    outputs:
-      package: ${{ steps.python.outputs.package }}
+      - name: Build & Push Docker Image
+        id: build
+        uses: teveltech/composite-docker@master
+        with:
+          namespace: ${{ env.namespace }}
+          arch: ${{ env.arch }}
+          registry: ${{ secrets.JFROG_URL }}
+          username: ${{ secrets.DOCKER_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+          new_tag: ${{ needs.version.outputs.new_tag }}
+          branch: ${{ needs.version.outputs.branch }}
+          previous_light_tag: ${{ needs.version.outputs.previous_light_tag }}
       
   release:
     name: Git tag and GitHub release
@@ -70,22 +77,22 @@ jobs:
     container: jfrog.local:8081/reg/base/base-ci:master
     
     steps:     
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          persist-credentials: true
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        persist-credentials: true
+        
+    - name: Handle git tag and github release
+      uses: teveltech/composite-release@master
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        new_tag: ${{ needs.version.outputs.new_tag }}
+        prerelease: ${{ needs.version.outputs.prerelease }}
+        changelog: ${{ needs.version.outputs.changelog }}
+        body: |
+          Docker pull command:
+          <pre><code> docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }} </code></pre>
+        warning: |
+          Docker pull command:
+          docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }}
           
-      - name: Handle git tag and github release
-        uses: teveltech/composite-release@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          new_tag: ${{ needs.version.outputs.new_tag }}
-          prerelease: ${{ needs.version.outputs.prerelease }}
-          changelog: ${{ needs.version.outputs.changelog }}
-          body: |
-            New python package:
-            <pre><code> ${{ needs.build.outputs.package }} </code></pre>
-          warning: |
-            New python package:
-            ${{ needs.build.outputs.package }}
-            
