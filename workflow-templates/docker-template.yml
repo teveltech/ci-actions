@@ -29,26 +29,26 @@ jobs:
           echo "Branch name: ${{ steps.semantic.outputs.branch }}"
           echo "Pre-release: ${{ steps.semantic.outputs.prerelease }}"
           echo "Workflow was triggered from ${{ github.event_name }}"
-          echo "Previous annotated tag: ${{ steps.semantic.outputs.previous_tag }}"
-          echo "Previous lightweight tag: ${{ steps.semantic.outputs.previous_light_tag }}"
-          if [ -z "${{ steps.semantic.outputs.new_tag }}" ]; then
+          echo "Previous annotated tag: ${{ steps.semantic.outputs.previous-tag }}"
+          echo "Previous lightweight tag: ${{ steps.semantic.outputs.previous-light-tag }}"
+          if [ -z "${{ steps.semantic.outputs.new-tag }}" ]; then
             echo "::error::No version bump - no new tag or release will be created. Usually means the workflow was triggered manually or a new branch was created without any changes."
           else
-            echo "New tag: ${{ steps.semantic.outputs.new_tag }}"
+            echo "New tag: ${{ steps.semantic.outputs.new-tag }}"
           fi
           
     outputs:
-      new_tag: ${{ steps.semantic.outputs.new_tag }}
-      new_version: ${{ steps.semantic.outputs.new_version }}
+      new-tag: ${{ steps.semantic.outputs.new-tag }}
+      new-version: ${{ steps.semantic.outputs.new-version }}
       changelog: ${{ steps.semantic.outputs.changelog }}
-      previous_tag: ${{ steps.semantic.outputs.previous_tag }}
+      previous-tag: ${{ steps.semantic.outputs.previous-tag }}
       prerelease: ${{ steps.semantic.outputs.prerelease }}
-      previous_light_tag: ${{ steps.semantic.outputs.previous_light_tag }}
+      previous-light-tag: ${{ steps.semantic.outputs.previous-light-tag }}
       branch: ${{ steps.semantic.outputs.branch }}
       
   build:
     needs: version
-    name: Build & Push
+    name: Docker Build & Push
     runs-on: self-hosted
     
     steps:
@@ -66,9 +66,9 @@ jobs:
           registry: ${{ secrets.JFROG_URL }}
           username: ${{ secrets.DOCKER_REGISTRY_USER }}
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
-          new_tag: ${{ needs.version.outputs.new_tag }}
+          new-tag: ${{ needs.version.outputs.new-tag }}
           branch: ${{ needs.version.outputs.branch }}
-          previous_light_tag: ${{ needs.version.outputs.previous_light_tag }}
+          previous-light-tag: ${{ needs.version.outputs.previous-light-tag }}
       
   release:
     name: Git tag and GitHub release
@@ -86,13 +86,13 @@ jobs:
       uses: teveltech/composite-release@master
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        new_tag: ${{ needs.version.outputs.new_tag }}
+        new-tag: ${{ needs.version.outputs.new-tag }}
         prerelease: ${{ needs.version.outputs.prerelease }}
         changelog: ${{ needs.version.outputs.changelog }}
         body: |
           Docker pull command:
-          <pre><code> docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }} </code></pre>
+          <pre><code> docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new-tag }} </code></pre>
         warning: |
           Docker pull command:
-          docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new_tag }}
+          docker pull jfrog.local:8081/reg/${{ env.namespace }}/${{ github.event.repository.name }}:${{ needs.version.outputs.new-tag }}
           
