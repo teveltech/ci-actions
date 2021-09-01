@@ -62,7 +62,7 @@ jobs:
         uses: teveltech/composite-docker@master
         with:
           namespace: ${{ env.namespace }}
-          arch: ${{ env.arch }}
+          platforms: ${{ env.arch }}
           registry: ${{ secrets.JFROG_URL }}
           username: ${{ secrets.DOCKER_REGISTRY_USER }}
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
