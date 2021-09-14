@@ -46,7 +46,7 @@ jobs:
       previous-light-tag: ${{ steps.semantic.outputs.previous-light-tag }}
       branch: ${{ steps.semantic.outputs.branch }}
       
-  build:
+  docker:
     needs: version
     name: Docker Build & Push
     runs-on: self-hosted
@@ -58,7 +58,7 @@ jobs:
           persist-credentials: false
           
       - name: Build & Push Docker Image
-        id: build
+        id: docker
         uses: teveltech/composite-docker@master
         with:
           namespace: ${{ env.namespace }}
@@ -72,7 +72,7 @@ jobs:
       
   release:
     name: Git tag and GitHub release
-    needs: [version, build]
+    needs: [version, docker]
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-ci:master
     

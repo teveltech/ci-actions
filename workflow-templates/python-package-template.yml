@@ -42,7 +42,7 @@ jobs:
       previous-light-tag: ${{ steps.semantic.outputs.previous-light-tag }}
       branch: ${{ steps.semantic.outputs.branch }}
       
-  build:
+  python:
     needs: version
     name: Build & Push
     runs-on: self-hosted
@@ -65,7 +65,7 @@ jobs:
       
   release:
     name: Git tag and GitHub release
-    needs: [version, build]
+    needs: [version, python]
     runs-on: self-hosted
     container: jfrog.local:8081/reg/base/base-ci:master
     
@@ -84,8 +84,8 @@ jobs:
           changelog: ${{ needs.version.outputs.changelog }}
           body: |
             New python package:
-            <pre><code> ${{ needs.build.outputs.package }} </code></pre>
+            <pre><code> ${{ needs.python.outputs.package }} </code></pre>
           warning: |
             New python package:
-            ${{ needs.build.outputs.package }}
+            ${{ needs.python.outputs.package }}
             
